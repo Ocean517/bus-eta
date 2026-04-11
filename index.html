@@ -2,123 +2,117 @@
 <html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="青衣巴士">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>巴士到站時間</title>
   <style>
     body {
-      font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
-      background: #1a1a1a;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background: #f8f8f8;
       margin: 0;
-      padding: 8px;
-      color: #eee;
-      height: 100vh;
-      overflow: hidden;
+      padding: 10px;
+      color: #333;
     }
-    .container { 
-      max-width: 100%; 
-      margin: auto; 
-    }
+    .container { max-width: 850px; margin: auto; }
     h1 { 
       text-align: center; 
-      color: #ff4d4d; 
-      margin: 12px 0 16px;
-      font-size: 1.65em;
+      color: #e30613; 
+      margin-bottom: 15px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
     }
 
     .stop-card {
-      background: #2a2a2a;
-      margin: 10px 0;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      background: white;
+      margin: 12px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       overflow: hidden;
     }
 
     .header {
       background: #e30613;
       color: white;
-      padding: 16px 18px;
-      font-size: 1.4em;
+      padding: 14px 18px;
+      font-size: 1.35em;
       font-weight: bold;
     }
 
     .route-info {
-      padding: 12px 18px;
-      background: #2a2a2a;
-      border-bottom: 1px solid #444;
-      font-size: 1.15em;
-      color: #ccc;
+      padding: 14px 18px;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      font-size: 1.1em;
+      color: #555;
     }
 
-    .eta-box { padding: 18px; }
+    .eta-box { padding: 16px 18px; }
 
     .eta-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 18px 0;
-      border-bottom: 1px solid #444;
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
     }
+
     .eta-row:last-child { border-bottom: none; }
 
     .route-dest {
-      font-size: 1.55em;
+      font-size: 1.4em;
       font-weight: bold;
     }
-    .route { color: #ff4d4d; }
-    .dest { color: #bbb; font-size: 1.1em; margin-top: 6px; }
+    .route { color: #e30613; }
+    .dest { color: #555; font-size: 1.05em; margin-top: 4px; }
 
     .minutes {
-      font-size: 3.8em;
+      font-size: 3em;
       font-weight: bold;
-      color: #4ade80;
+      color: #2e7d32;
       text-align: right;
       line-height: 1;
     }
 
     .min-label {
-      font-size: 1.2em;
-      color: #4ade80;
+      font-size: 1.1em;
+      color: #2e7d32;
       text-align: right;
-      margin-top: -10px;
+      margin-top: -8px;
     }
 
     .remark {
-      font-size: 1em;
-      color: #ff6b6b;
+      font-size: 0.95em;
+      color: #d32f2f;
       text-align: right;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .loading {
       text-align: center;
-      padding: 50px 20px;
-      color: #888;
+      padding: 45px;
+      color: #666;
       font-style: italic;
-      font-size: 1.1em;
     }
 
     .last-update {
       text-align: center;
-      margin-top: 12px;
-      color: #777;
-      font-size: 1em;
+      margin-top: 15px;
+      color: #666;
+      font-size: 0.95em;
     }
 
     button {
-      font-size: 0.75em;
+      font-size: 0.65em;
       padding: 8px 16px;
       background: #e30613;
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
+    }
+    button:hover {
+      background: #c4000f;
     }
   </style>
 </head>
@@ -126,7 +120,7 @@
   <div class="container">
     <h1>
       🚌 巴士到站時間
-      <button onclick="refreshAll()">⟳</button>
+      <button onclick="refreshAll()">⟳ 重新整理</button>
     </h1>
 
     <!-- 1. 翠怡花園 41A -->
@@ -172,9 +166,13 @@
       const box = document.getElementById(config.id);
       try {
         const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${config.stopId}`);
-        if (!res.ok) throw new Error('Network error');
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
 
         const json = await res.json();
+
         let nextBus = null;
         let soonest = Infinity;
 
@@ -216,28 +214,36 @@
         box.innerHTML = html;
 
       } catch (e) {
-        console.error(e);
-        box.innerHTML = `<div class="loading">無法連接到數據</div>`;
+        console.error(`Error fetching ${config.route}:`, e);
+        box.innerHTML = `<div class="loading">無法連接到數據，請稍後重試</div>`;
       }
     }
 
     async function refreshAll() {
+      // Update the last updated time
       const now = new Date();
       document.getElementById('update-time').textContent = 
-        `最後更新：${now.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        `最後更新：${now.toLocaleTimeString('zh-HK', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit' 
+        })}`;
 
-      await Promise.all(configs.map(c => getNextBus(c)));
+      // Load all stops in parallel for better performance
+      await Promise.all(configs.map(config => getNextBus(config)));
     }
 
     // Initial load
     refreshAll();
 
-    // Auto refresh
+    // Auto refresh every 20 seconds
     setInterval(refreshAll, 20000);
 
-    // Refresh when returning to the app
+    // Refresh when user returns to the tab (important for mobile)
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') refreshAll();
+      if (document.visibilityState === 'visible') {
+        refreshAll();
+      }
     });
   </script>
 </body>
