@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>巴士到站時間</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background: #f8f8f8;
+      margin: 0;
+      padding: 10px;
+      color: #333;
+    }
+    .container { max-width: 850px; margin: auto; }
+    h1 { 
+      text-align: center; 
+      color: #e30613; 
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .stop-card {
+      background: white;
+      margin: 12px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: #e30613;
+      color: white;
+      padding: 14px 18px;
+      font-size: 1.35em;
+      font-weight: bold;
+    }
+
+    .route-info {
+      padding: 14px 18px;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      font-size: 1.1em;
+      color: #555;
+    }
+
+    .eta-box { padding: 16px 18px; }
+
+    .eta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .eta-row:last-child { border-bottom: none; }
+
+    .route-dest {
+      font-size: 1.4em;
+      font-weight: bold;
+    }
+    .route { color: #e30613; }
+    .dest { color: #555; font-size: 1.05em; margin-top: 4px; }
+
+    .minutes {
+      font-size: 3em;
+      font-weight: bold;
+      color: #2e7d32;
+      text-align: right;
+      line-height: 1;
+    }
+
+    .min-label {
+      font-size: 1.1em;
+      color: #2e7d32;
+      text-align: right;
+      margin-top: -8px;
+    }
+
+    .remark {
+      font-size: 0.95em;
+      color: #d32f2f;
+      text-align: right;
+      margin-top: 6px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 45px;
+      color: #666;
+      font-style: italic;
+    }
+
+    .last-update {
+      text-align: center;
+      margin-top: 15px;
+      color: #666;
+      font-size: 0.95em;
+    }
+
+    button {
+      font-size: 0.65em;
+      padding: 8px 16px;
+      background: #e30613;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #c4000f;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      🚌 巴士到站時間
+      <button onclick="refreshAll()">⟳ 重新整理</button>
+    </h1>
+
+    <!-- 1. 翠怡花園 41A -->
+    <div class="stop-card">
+      <div class="header">翠怡花園 (TY243) → 尖沙咀東</div>
+      <div class="route-info">41A 青衣(長安邨) 開出</div>
+      <div class="eta-box" id="eta1"><div class="loading">正在載入...</div></div>
+    </div>
+
+    <!-- 2. 青衣警署 A32 -->
+    <div class="stop-card">
+      <div class="header">青衣警署 (TY352) → 葵涌邨</div>
+      <div class="route-info">A32 機場 / 港珠澳大橋 開出</div>
+      <div class="eta-box" id="eta2"><div class="loading">正在載入...</div></div>
+    </div>
+
+    <!-- 3. 翠怡花園 44M -->
+    <div class="stop-card">
+      <div class="header">翠怡花園 (TY243) → 葵涌邨</div>
+      <div class="route-info">44M 青衣站 開出</div>
+      <div class="eta-box" id="eta3"><div class="loading">正在載入...</div></div>
+    </div>
+
+    <!-- 4. 青衣警署 43B -->
+    <div class="stop-card">
+      <div class="header">青衣警署 (TY353) → 荃灣西站</div>
+      <div class="route-info">43B 青衣(長青邨) 開出</div>
+      <div class="eta-box" id="eta4"><div class="loading">正在載入...</div></div>
+    </div>
+  </div>
+
+  <div class="last-update" id="update-time">最後更新：--</div>
+
+  <script>
+    const configs = [
+      { id: "eta1", stopId: "5BDACC01F1655F27", route: "41A" },
+      { id: "eta2", stopId: "B0D304F9542AE3BF", route: "A32" },
+      { id: "eta3", stopId: "5BDACC01F1655F27", route: "44M" },
+      { id: "eta4", stopId: "59B81980AC8F7878", route: "43B" }
+    ];
+
+    async function getNextBus(config) {
+      const box = document.getElementById(config.id);
+      try {
+        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${config.stopId}`);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        let nextBus = null;
+        let soonest = Infinity;
+
+        if (json.data && Array.isArray(json.data)) {
+          json.data.forEach(bus => {
+            if (bus.route === config.route && bus.eta) {
+              const time = new Date(bus.eta).getTime();
+              if (time < soonest) {
+                soonest = time;
+                nextBus = bus;
+              }
+            }
+          });
+        }
+
+        if (!nextBus) {
+          box.innerHTML = `<div class="loading">目前沒有 ${config.route} 巴士即將到站</div>`;
+          return;
+        }
+
+        const minutes = Math.round((new Date(nextBus.eta) - new Date()) / 60000);
+        const timeText = minutes <= 0 ? '即將' : minutes;
+
+        let html = `
+          <div class="eta-row">
+            <div>
+              <div class="route-dest">
+                <span class="route">${nextBus.route}</span> 
+                <span class="dest">→ ${nextBus.dest_tc}</span>
+              </div>
+            </div>
+            <div>
+              <div class="minutes">${timeText}</div>
+              <div class="min-label">分鐘</div>
+              ${nextBus.rmk_tc ? `<div class="remark">${nextBus.rmk_tc}</div>` : ''}
+            </div>
+          </div>`;
+
+        box.innerHTML = html;
+
+      } catch (e) {
+        console.error(`Error fetching ${config.route}:`, e);
+        box.innerHTML = `<div class="loading">無法連接到數據，請稍後重試</div>`;
+      }
+    }
+
+    async function refreshAll() {
+      // Update the last updated time
+      const now = new Date();
+      document.getElementById('update-time').textContent = 
+        `最後更新：${now.toLocaleTimeString('zh-HK', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit' 
+        })}`;
+
+      // Load all stops in parallel for better performance
+      await Promise.all(configs.map(config => getNextBus(config)));
+    }
+
+    // Initial load
+    refreshAll();
+
+    // Auto refresh every 20 seconds
+    setInterval(refreshAll, 20000);
+
+    // Refresh when user returns to the tab (important for mobile)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshAll();
+      }
+    });
+  </script>
+</body>
+</html>
